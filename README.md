@@ -38,7 +38,7 @@ To maximize battery longevity for remote or standalone field deployments, the sy
 * **Thermal Sensing:** AM312 Digital Mini PIR Motion Sensor
 * **Microwave Sensing:** RCWL-0516 Doppler Radar Module
 * **Distance Sensing:** HC-SR04 Ultrasonic Ranging Module
-* **Peripherals:** Buzzer, Logic LEDs, Resistors ($220\Omega$, $1\text{k}\Omega$, $2\text{k}\Omega$ for voltage division)
+* **Peripherals:** Buzzer, Logic LEDs, Resistors  
 
 ---
 
