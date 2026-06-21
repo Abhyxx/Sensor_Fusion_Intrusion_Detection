@@ -1,0 +1,757 @@
+#Just update your ip from esp32's serial monitor
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cascade IDS Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --bg-body: #0b0f19;
+            --bg-card: #131a26;
+            --text-main: #f1f5f9;
+            --text-muted: #64748b;
+            --primary: #2563eb;
+            --primary-glow: rgba(37, 99, 235, 0.4);
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #1e293b;
+            --neon-accent: #06b6d4;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            padding: 2.5rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2.5rem;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+
+        .brand h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: var(--text-main);
+        }
+
+        .brand h1 span {
+            color: var(--neon-accent);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+        }
+
+        .brand p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .action-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .ip-input-box {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 0.625rem 1rem;
+            border-radius: 6px;
+            outline: none;
+            transition: border-color 0.2s ease;
+            width: 160px;
+        }
+
+        .ip-input-box:focus {
+            border-color: var(--neon-accent);
+        }
+
+        .btn {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 0.625rem 1.25rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+
+        .btn-outline:hover {
+            background: #1e293b;
+            border-color: var(--neon-accent);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            border: 1px solid var(--primary);
+            color: white;
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .sensor-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .sensor-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 150px;
+            position: relative;
+            transition: border-color 0.3s ease;
+        }
+
+        .sensor-section.active-pulse {
+            border-color: var(--neon-accent);
+        }
+
+        .section-header {
+            font-size: 0.815rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .live-tag {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #1e293b;
+        }
+
+        .tag-always { color: var(--neon-accent); border: 1px solid rgba(6, 182, 212, 0.3); }
+        .tag-cascade { color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+        .sensor-data {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-top: auto;
+        }
+
+        .status-secure { color: var(--success); }
+        .status-alert { color: var(--danger); }
+        .status-off { color: #334155; }
+
+        .visualizer-layout {
+            display: grid;
+            grid-template-columns: 1.6fr 1.4fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .visualizer-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-frame {
+            height: 280px;
+            width: 100%;
+            position: relative;
+            margin-top: 0.5rem;
+        }
+
+        .gauge-wrapper {
+            position: relative;
+            width: 220px;
+            height: 120px;
+            margin: 1rem auto 0 auto;
+        }
+
+        .ultrasonic-analytics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: auto;
+            padding-top: 1rem;
+        }
+
+        .metric-subcard {
+            background: #0f172a;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .metric-subcard p {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.5px;
+        }
+
+        /* PDF Output Formats */
+        #report-template {
+            display: none;
+            background: white;
+            color: #0f172a;
+            padding: 0.4in;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .report-header {
+            border-bottom: 3px solid #0f172a;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .report-header h2 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 0.5px;
+            color: #0f172a;
+        }
+
+        .report-meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .report-section-title {
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+            margin: 1.5rem 0 0.5rem 0;
+            color: #1e293b;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 0.25rem;
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .report-table th, .report-table td {
+            border: 1px solid #cbd5e1;
+            padding: 0.5rem 0.6rem;
+            text-align: left;
+        }
+
+        .report-table th {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        .report-table tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .badge-secure { color: #10b981; font-weight: bold; }
+        .badge-alert { color: #ef4444; font-weight: bold; }
+
+        .report-footer {
+            margin-top: 3rem;
+            border-top: 1px dashed #cbd5e1;
+            padding-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <h1><span>Energy Aware Intrusion Detection</span></h1>
+            <p>Dashboard Control Unit</p>
+        </div>
+        <div class="action-controls">
+            <input type="text" id="node-ip-field" class="ip-input-box" value="172.20.10.4" placeholder="ESP32 IP Address" onchange="connectWebSocket()">
+            <button id="pause-btn" class="btn btn-outline" onclick="toggleCurveUpdate()">Pause Stream</button>
+            <button class="btn btn-primary" onclick="generatePDFReport()">Export Audit PDF</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="sensor-container">
+            <section class="sensor-section active-pulse">
+                <div class="section-header">
+                    <span>Doppler Radar Array</span>
+                    <span class="live-tag tag-always">ALWAYS ON</span>
+                </div>
+                <div id="radar-val" class="sensor-data status-secure">STILL</div>
+            </section>
+
+            <section class="sensor-section" id="pir-card">
+                <div class="section-header">
+                    <span>PIR Thermal Sensor</span>
+                    <span id="pir-tag" class="live-tag">SLEEPING</span>
+                </div>
+                <div id="pir-val" class="sensor-data status-off">OFFLINE</div>
+            </section>
+
+            <section class="sensor-section" id="speed-card">
+                <div class="section-header">
+                    <span>Tracking Speed</span>
+                    <span class="live-tag tag-always">LIVE</span>
+                </div>
+                <div id="speed-val" class="sensor-data status-secure">0.0 m/s</div>
+            </section>
+
+            <section class="sensor-section" id="inf-card">
+                <div class="section-header">
+                    <span>Inference Consensus</span>
+                    <span class="live-tag tag-cascade">CASCADE ONLY</span>
+                </div>
+                <div id="inference-val" class="sensor-data status-secure">SECURE</div>
+            </section>
+        </div>
+
+        <div class="visualizer-layout">
+            <div class="panel">
+                <div class="section-header">Ultrasonic Proximity Trend Line</div>
+                <div class="chart-frame">
+                    <canvas id="telemetryChart"></canvas>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="section-header">Ultrasonic Speedometer / Ranging</div>
+                <div class="gauge-wrapper">
+                    <canvas id="gaugeChart"></canvas>
+                </div>
+                <div class="ultrasonic-analytics-grid">
+                    <div class="metric-subcard">
+                        <p>Target Distance</p>
+                        <div id="distance-val" class="sensor-data status-off" style="font-size: 1.35rem; margin-top: 0;">OFFLINE</div>
+                    </div>
+                    <div class="metric-subcard">
+                        <p>Range Status</p>
+                        <div id="range-status-val" class="sensor-data status-secure" style="font-size: 1.15rem; margin-top: 0;">CLEAR</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="report-template">
+        <div class="report-header">
+            <div>
+                <h2>CASCADE IDS SECURITY AUDIT</h2>
+                <p style="font-size: 0.8rem; color: #475569; margin-top: 0.25rem;">Automated Perimeter Analytics Log Sheet</p>
+            </div>
+            <div style="font-size: 0.8rem; text-align: right; color: #475569;">
+                <p><strong>Node Class:</strong> Edge Microprocessor</p>
+                <p><strong>Protocol:</strong> WebSocket TLS/Raw</p>
+            </div>
+        </div>
+
+        <div class="report-meta-grid">
+            <div>
+                <p><strong>Target Security Filter Rule:</strong> Sequential Cascade Verification Control Loop</p>
+                <p><strong>Active Network Hardware Hook:</strong> <span id="rep-node-ip">172.20.10.2</span></p>
+                <p><strong>Audit Scope Window:</strong> Last 5 Minutes Continuous Run History</p>
+            </div>
+            <div>
+                <p><strong>Generated Timestamp:</strong> <span id="report-time"></span></p>
+                <p><strong>Total Recorded Entries:</strong> <span id="rep-log-count">0</span></p>
+                <p><strong>System Perimeter Verdict:</strong> <span id="rep-current-verdict" style="font-weight: bold;">SECURE</span></p>
+            </div>
+        </div>
+
+        <div class="report-section-title">Current Live Sensor Snapshots</div>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Sensor Node Block Channel</th>
+                    <th>Latest Telemetry State</th>
+                    <th>Cascade Rule Assignment Evaluation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Doppler Microwave Matrix Network</td>
+                    <td id="rep-radar" style="font-weight: 600;">STILL</td>
+                    <td>Primary Monitoring Scan State Layer (Always Live)</td>
+                </tr>
+                <tr>
+                    <td>PIR Ambient Thermal Array</td>
+                    <td id="rep-pir" style="font-weight: 600;">OFFLINE</td>
+                    <td>Secondary Phase Routine Verification Block</td>
+                </tr>
+                <tr>
+                    <td>Ultrasonic Range Finder Module</td>
+                    <td id="rep-dist" style="font-weight: 600;">OFFLINE</td>
+                    <td>Tertiary Localization Scan Ranging Metric Space</td>
+                </tr>
+                <tr>
+                    <td>Calculated Velocity Processor</td>
+                    <td id="rep-speed" style="font-weight: 600;">0.0 m/s</td>
+                    <td>Dynamic Target Delta Vector Kinematic Computation</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="report-section-title">Historical Continuous Stream Log (Last 5 Minutes Roll)</div>
+        <div style="max-height: 420px; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 0.5rem;">
+            <table class="report-table" style="margin-top: 0;" id="report-history-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Doppler Radar</th>
+                        <th>PIR Sensor</th>
+                        <th>Distance (cm)</th>
+                        <th>Speed (m/s)</th>
+                        <th>Consensus Verdict</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="report-footer">
+            <p>System Hash Security Clearance Validation Code: [SEC-EAAIDS-X86-2026]</p>
+            <p>Signature Validation: ___________________________</p>
+        </div>
+    </div>
+
+    <script>
+        let isCurveUpdating = true;
+        let socket = null;
+        let runningTimelineBuffer = [];
+
+        // Global Chart Objects
+        let telemetryChart;
+        let gaugeChart;
+
+        function initCharts() {
+            const ctxCurve = document.getElementById('telemetryChart').getContext('2d');
+            telemetryChart = new Chart(ctxCurve, {
+                type: 'line',
+                data: {
+                    labels: ['Start'],
+                    datasets: [{
+                        label: 'Proximity Delta (cm)',
+                        borderColor: '#06b6d4',
+                        borderWidth: 2.5,
+                        backgroundColor: 'rgba(6, 182, 212, 0.05)',
+                        data: [0],
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { 
+                            grid: { color: 'rgba(30, 41, 59, 0.5)' }, 
+                            ticks: { color: '#64748b' } 
+                        },
+                        y: { 
+                            grid: { color: 'rgba(30, 41, 59, 0.5)' }, 
+                            ticks: { color: '#64748b' }, 
+                            min: 0, 
+                            max: 300 
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const ctxGauge = document.getElementById('gaugeChart').getContext('2d');
+            gaugeChart = new Chart(ctxGauge, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Target Clear Distance', 'System Remainder Space'],
+                    datasets: [{
+                        data: [150, 150], 
+                        backgroundColor: ['#06b6d4', '#1e293b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    rotation: -90,
+                    circumference: 180,
+                    cutout: '80%',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } }
+                }
+            });
+        }
+
+        function toggleCurveUpdate() {
+            isCurveUpdating = !isCurveUpdating;
+            const btn = document.getElementById('pause-btn');
+            btn.innerText = isCurveUpdating ? "Pause Stream" : "Resume Stream";
+        }
+
+        function connectWebSocket() {
+            const targetIP = document.getElementById('node-ip-field').value.trim();
+            console.log(`[WebSocket] Establishing interface socket stream: ws://${targetIP}:81`);
+            
+            if(socket) {
+                try { socket.close(); } catch(e){}
+            }
+
+            socket = new WebSocket(`ws://172.20.10.4:81`); 
+
+            socket.onopen = function(e) {
+                console.log("[WebSocket] Pipeline handshakes completed.");
+                document.getElementById('node-ip-field').style.borderColor = "#10b981";
+            };
+
+            socket.onmessage = function(event) {
+                const rawData = event.data;
+                const telemetryArray = rawData.split(',');
+
+                const radar = telemetryArray[0] || "STILL";
+                const pir = telemetryArray[1] || "OFFLINE";
+                const distance = parseFloat(telemetryArray[2]);
+                const inference = telemetryArray[3] || "SECURE";
+                
+                let speed = 0.0;
+                if(telemetryArray.length > 4) {
+                    speed = parseFloat(telemetryArray[4]);
+                } else {
+                    if(runningTimelineBuffer.length > 0 && !isNaN(distance) && distance > 0 && distance < 300) {
+                        const prevDist = runningTimelineBuffer[runningTimelineBuffer.length - 1].distance;
+                        if(!isNaN(prevDist) && prevDist > 0) {
+                            speed = Math.abs((distance - prevDist) / 1.0);
+                        }
+                    }
+                }
+                if(isNaN(speed) || speed < 0) speed = 0.0;
+
+                const timestamp = new Date();
+                const cleanTimeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                const telemetryLogNode = {
+                    timeObj: timestamp,
+                    timeStr: cleanTimeString,
+                    radar: radar,
+                    pir: pir,
+                    distance: isNaN(distance) ? 0 : distance,
+                    speed: speed.toFixed(2),
+                    inference: inference
+                };
+
+                runningTimelineBuffer.push(telemetryLogNode);
+                const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+                runningTimelineBuffer = runningTimelineBuffer.filter(log => log.timeObj >= fiveMinutesAgo);
+
+                document.getElementById('radar-val').innerText = radar;
+                document.getElementById('pir-val').innerText = pir;
+                document.getElementById('distance-val').innerText = (distance > 0 && distance < 900) ? `${distance.toFixed(1)} cm` : "OFFLINE";
+                document.getElementById('speed-val').innerText = `${speed.toFixed(2)} m/s`;
+                document.getElementById('inference-val').innerText = inference;
+
+                const pirCard = document.getElementById('pir-card');
+                const pirTag = document.getElementById('pir-tag');
+                const distVal = document.getElementById('distance-val');
+                const rangeStatusVal = document.getElementById('range-status-val');
+                const speedCard = document.getElementById('speed-card');
+                const speedVal = document.getElementById('speed-val');
+
+                if(radar === "MOTION DETECTED") {
+                    document.getElementById('radar-val').className = "sensor-data status-alert";
+                    pirCard.classList.add('active-pulse');
+                    pirTag.innerText = "WOKEN UP";
+                    pirTag.className = "live-tag tag-cascade";
+                } else {
+                    document.getElementById('radar-val').className = "sensor-data status-secure";
+                    pirCard.classList.remove('active-pulse');
+                    pirTag.innerText = "SLEEPING";
+                    pirTag.className = "live-tag";
+                }
+
+                if(pir === "BODY DETECTED") {
+                    document.getElementById('pir-val').className = "sensor-data status-alert";
+                    distVal.className = "sensor-data status-alert";
+                    rangeStatusVal.innerText = "WARNING";
+                    rangeStatusVal.className = "sensor-data status-alert";
+                } else {
+                    document.getElementById('pir-val').className = (pir === "OFFLINE") ? "sensor-data status-off" : "sensor-data status-secure";
+                    distVal.className = (pir === "OFFLINE") ? "sensor-data status-off" : "sensor-data status-secure";
+                    rangeStatusVal.innerText = (pir === "OFFLINE") ? "OFFLINE" : "CLEAR";
+                    rangeStatusVal.className = (pir === "OFFLINE") ? "sensor-data status-off" : "sensor-data status-secure";
+                }
+
+                if(speed > 1.2) {
+                    speedVal.className = "sensor-data status-alert";
+                    speedCard.classList.add('active-pulse');
+                } else {
+                    speedVal.className = "sensor-data status-secure";
+                    speedCard.classList.remove('active-pulse');
+                }
+                
+                document.getElementById('inference-val').className = `sensor-data ${(inference !== "SECURE") ? 'status-alert' : 'status-secure'}`;
+
+                // Update Radial Gauge Data Map safely
+                const activeGaugeDistance = (isNaN(distance) || distance <= 0 || distance > 300) ? 0 : distance;
+                if(gaugeChart) {
+                    gaugeChart.data.datasets[0].data = [activeGaugeDistance, 300 - activeGaugeDistance];
+                    gaugeChart.update();
+                }
+
+                // Append and trace to trendline data vector arrays
+                if (isCurveUpdating && distance > 0 && distance < 300 && telemetryChart) {
+                    if (telemetryChart.data.labels[0] === 'Start') {
+                        telemetryChart.data.labels.shift();
+                        telemetryChart.data.datasets[0].data.shift();
+                    }
+                    if (telemetryChart.data.labels.length > 15) {
+                        telemetryChart.data.labels.shift();
+                        telemetryChart.data.datasets[0].data.shift();
+                    }
+                    telemetryChart.data.labels.push(cleanTimeString);
+                    telemetryChart.data.datasets[0].data.push(activeGaugeDistance);
+                    telemetryChart.update();
+                }
+            };
+
+            socket.onclose = function(event) {
+                console.log("[WebSocket] Connection lost. Re-enabling loop sequence...");
+                document.getElementById('node-ip-field').style.borderColor = "#ef4444";
+                setTimeout(connectWebSocket, 4000);
+            };
+        }
+
+        window.onload = function() {
+            initCharts();
+            connectWebSocket();
+        };
+
+        function generatePDFReport() {
+            const ipVal = document.getElementById('node-ip-field').value.trim();
+            document.getElementById('report-time').innerText = new Date().toLocaleString();
+            document.getElementById('rep-node-ip').innerText = ipVal;
+            document.getElementById('rep-log-count').innerText = runningTimelineBuffer.length;
+            
+            const currentVerdict = document.getElementById('inference-val').innerText;
+            const verdictRep = document.getElementById('rep-current-verdict');
+            verdictRep.innerText = currentVerdict;
+            verdictRep.className = (currentVerdict === "SECURE") ? "badge-secure" : "badge-alert";
+
+            document.getElementById('rep-radar').innerText = document.getElementById('radar-val').innerText;
+            document.getElementById('rep-pir').innerText = document.getElementById('pir-val').innerText;
+            document.getElementById('rep-dist').innerText = document.getElementById('distance-val').innerText;
+            document.getElementById('rep-speed').innerText = document.getElementById('speed-val').innerText;
+
+            const tableBody = document.getElementById('report-history-table').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = "";
+
+            if(runningTimelineBuffer.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #64748b;">No telemetry metrics verified inside the log within the past 5 minutes.</td></tr>`;
+            } else {
+                for(let i = runningTimelineBuffer.length - 1; i >= 0; i--) {
+                    const rowRecord = runningTimelineBuffer[i];
+                    const row = document.createElement('tr');
+                    
+                    const cellVerdictClass = (rowRecord.inference === "SECURE") ? "badge-secure" : "badge-alert";
+                    const cellDistStr = (rowRecord.distance > 0 && rowRecord.distance < 900) ? `${rowRecord.distance.toFixed(1)} cm` : "OFFLINE";
+
+                    row.innerHTML = `
+                        <td>${rowRecord.timeStr}</td>
+                        <td>${rowRecord.radar}</td>
+                        <td>${rowRecord.pir}</td>
+                        <td>${cellDistStr}</td>
+                        <td>${rowRecord.speed} m/s</td>
+                        <td class="${cellVerdictClass}">${rowRecord.inference}</td>
+                    `;
+                    tableBody.appendChild(row);
+                }
+            }
+
+            const element = document.getElementById('report-template');
+            const configurationOptions = {
+                margin:       [0.3, 0.3, 0.3, 0.3],
+                filename:     `Cascade_IDS_Report_${new Date().toISOString().slice(0,10)}.pdf`,
+                image:        { type: 'jpeg', quality: 0.99 },
+                html2canvas:  { scale: 2, logging: false, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            element.style.display = 'block';
+            html2pdf().set(configurationOptions).from(element).save().then(() => {
+                element.style.display = 'none';
+            });
+        }
+    </script>
+</body>
+</html>
