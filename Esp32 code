@@ -1,0 +1,286 @@
+ /*
+======================================================
+SMART RADAR-FIRST GATED INTRUSION DETECTION SYSTEM
+======================================================
+
+Logic Chain Reaction:
+Stage 1: Radar Confirms Physical Motion (Standby Mode)
+                  ↓
+Stage 2: PIR Detects Heat Signature (Wake Step 1)
+                  ↓
+Stage 3: Ultrasonic Sensor Measures Target (Wake Step 2)
+                  ↓
+Result: Breach Verified if Distance < 50 cm
+======================================================
+*/
+
+#include <math.h>
+#include <WiFi.h>
+#include <WebSocketsServer.h>
+
+// WiFi Configuration Settings
+const char* ssid = "wifi name";         // Change this to your Wi-Fi name
+const char* password = "Wifi password"; // Change this to your Wi-Fi password
+
+// WebSocket Server Instance running on Network Port 81
+WebSocketsServer webSocket = WebSocketsServer(81);
+
+// HC-SR04 Ultrasonic Pins
+#define TRIG_PIN 5
+#define ECHO_PIN 18
+
+// Alert Devices
+#define LED_PIN 2
+#define BUZZER_PIN 4
+
+// Motion Sensors
+#define RADAR_PIN 27
+#define PIR_PIN 26   
+
+// System Configuration
+const float thresholdDistance = 50.0;
+
+// Analytical Tracking Variables
+float previousDistance = 0;
+unsigned long previousTime = 0;
+bool pirDetected = false;
+bool radarDetected = false;
+
+// Helper to broadcast structured data metrics out to the WebSocket clients
+void broadcastTelemetry(String radarStr, String pirStr, float distVal, String infStr, float speedVal) {
+    // Schema required by dashboard: "Radar,PIR,Distance,Inference,Speed"
+    String payload = radarStr + "," + pirStr + "," + String(distVal, 1) + "," + infStr + "," + String(speedVal, 2);
+    webSocket.broadcastTXT(payload);
+}
+
+// WebSocket Event Handler Callback Hook
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
+    switch(type) {
+        case WStype_DISCONNECTED:
+            Serial.printf("[%u] Client Disconnected.\n", num);
+            break;
+        case WStype_CONNECTED: {
+            IPAddress ip = webSocket.remoteIP(num);
+            Serial.printf("[%u] Client Linked Connection from: %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
+            break;
+        }
+        case WStype_TEXT:
+            break;
+    }
+}
+
+// ==========================================
+// Measure Distance
+// ==========================================
+float getDistance()
+{
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
+
+    // 12ms timeout keeps the code fast and responsive
+    long duration = pulseIn(ECHO_PIN, HIGH, 12000); 
+
+    if(duration == 0)
+        return -1.0;
+
+    return duration * 0.0343 / 2.0;
+}
+
+// ==========================================
+// Average 5 Readings
+// ==========================================
+float getAverageDistance()
+{
+    float total = 0;
+    int validReadings = 0;
+
+    for(int i = 0; i < 5; i++)
+    {
+        float reading = getDistance();
+        if (reading > 0) 
+        {
+            total += reading;
+            validReadings++;
+        }
+        delay(15);
+    }
+
+    if (validReadings == 0) return 999.0;
+    return total / (float)validReadings;
+}
+
+// ==========================================
+// Setup
+// ==========================================
+void setup()
+{
+    Serial.begin(115200);
+
+    pinMode(TRIG_PIN, OUTPUT);
+    pinMode(ECHO_PIN, INPUT);
+    pinMode(LED_PIN, OUTPUT);
+    pinMode(BUZZER_PIN, OUTPUT);
+    
+    pinMode(RADAR_PIN, INPUT);
+    pinMode(PIR_PIN, INPUT); 
+
+    digitalWrite(LED_PIN, LOW);
+    digitalWrite(BUZZER_PIN, LOW);
+
+    Serial.println("\n==============================================");
+    Serial.println("RADAR-GATED CHAIN REACTION SYSTEM INITIALIZED");
+    Serial.println("==============================================");
+    
+    // Connect to local Wi-Fi router network
+    WiFi.begin(ssid, password);
+    Serial.print("Connecting to Wi-Fi Networks");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println("\nWi-Fi Connection Established!");
+    Serial.print("IP Address to assign inside your HTML Panel: ");
+    Serial.println(WiFi.localIP());
+
+    // Spin up WebSockets layer configuration maps
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
+
+    delay(1000); 
+    Serial.println("System Monitoring Active.");
+}
+
+// ==========================================
+// Main Loop
+// ==========================================
+void loop()
+{
+    // Keeps the WebSocket routing connections humming engine active
+    webSocket.loop();
+    
+    unsigned long currentTime = millis();
+
+    // --------------------------------------------------
+    // STAGE 1: Radar Scan (Always Running Standby Gate)
+    // --------------------------------------------------
+    int radarCount = 0;
+    for(int i = 0; i < 10; i++)
+    {
+        radarCount += digitalRead(RADAR_PIN);
+        delay(5);
+    }
+    radarDetected = (radarCount >= 7); // Active debounce filtering
+
+    if (!radarDetected)
+    {
+        // System remains in low power sleep because no physical movement is nearby
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(BUZZER_PIN, LOW);
+        previousTime = 0; 
+        
+        Serial.println("Radar: CLEAR | PIR: SLEEPING | Ultrasonic: SLEEPING");
+        
+        // Update Dashboard with Ground-State Sleep Telemetry Map
+        broadcastTelemetry("STILL", "OFFLINE", 0.0, "SECURE", 0.00);
+        
+        delay(250); 
+        return; // Bypasses the rest of the loop immediately
+    }
+
+    // --------------------------------------------------
+    // STAGE 2: PIR Thermal Verification (Woken up by Radar)
+    // --------------------------------------------------
+    Serial.println("Radar: MOTION DETECTED! -> Waking up PIR...");
+    
+    int pirCount = 0;
+    for(int i = 0; i < 10; i++)
+    {
+        pirCount += digitalRead(PIR_PIN);
+        delay(3);
+    }
+    pirDetected = (pirCount >= 5); // Smooths out signal noise
+
+    if (!pirDetected)
+    {
+        // Filter out non-thermal motion (fans, wind, electrical noise)
+        Serial.println("[FILTERED] Radar: MOTION | PIR: NO HUMAN HEAT SIGNATURE");
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(BUZZER_PIN, LOW);
+        previousTime = 0;
+        
+        // Update Dashboard: Radar woke up, but PIR rejected it
+        broadcastTelemetry("MOTION DETECTED", "NO BODY", 0.0, "SECURE", 0.00);
+        
+        delay(150);
+        return; 
+    }
+
+    // --------------------------------------------------
+    // STAGE 3: Ultrasonic Wake Up (Both Sensors Confirmed)
+    // --------------------------------------------------
+    Serial.println("PIR: THERMAL LOCK CONFIRMED! -> Waking up Ultrasonic...");
+    
+    float distance = getAverageDistance();
+    float speed = 0;
+
+    // Calculate velocity trajectory
+    if(previousTime != 0 && distance < 900.0 && previousDistance < 900.0)
+    {
+        float deltaDistance = previousDistance - distance;
+        float deltaTime = (currentTime - previousTime) / 1000.0;
+
+        if(fabs(deltaDistance) < 2.0) deltaDistance = 0;
+        if(deltaTime > 0)             speed = deltaDistance / deltaTime;
+        if(fabs(speed) < 5.0)         speed = 0;
+    }
+
+    // Convert dynamic speed calculation metric from cm/s to metric m/s for display
+    float speedMetersPerSecond = (speed / 100.0);
+    if(speedMetersPerSecond < 0) speedMetersPerSecond = 0.0;
+
+    // Live Tracking Output
+    Serial.print("TARGET LOCKED -> Range: ");
+    if(distance > 900) Serial.print("Out of Bounds");
+    else { Serial.print(distance); Serial.print(" cm"); }
+    Serial.print(" | Speed: "); Serial.print(speed); Serial.println(" cm/s");
+
+    // Determine current processing inference matrix status string
+    String currentInference = (distance <= thresholdDistance && distance > 0) ? "BREACH VERIFIED" : "PENDING DETECT";
+
+    // Broadcast live structural vector updates up to Web UI Client before hitting physical pauses
+    broadcastTelemetry("MOTION DETECTED", "BODY DETECTED", distance, currentInference, speedMetersPerSecond);
+
+    // --------------------------------------------------
+    // STAGE 4: Boundary Threshold Breach Check
+    // --------------------------------------------------
+    if(distance <= thresholdDistance && distance > 0)
+    {
+        Serial.println("\n===== !!! INTRUSION VERIFIED !!! =====");
+        Serial.print("Verified Distance : "); Serial.print(distance); Serial.println(" cm");
+        Serial.print("Approach Speed    : "); Serial.print(speed);    Serial.println(" cm/s");
+        Serial.println("Radar Status      : DOPPLER TRACKING");
+        Serial.println("PIR Status        : THERMAL LOCK ON\n");
+
+        // Fire physical alert components
+        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(BUZZER_PIN, HIGH);
+        delay(400);
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(BUZZER_PIN, LOW);
+
+        currentTime = millis(); // Refresh timestamp post-delay
+    }
+    else
+    {
+        digitalWrite(LED_PIN, LOW);
+        digitalWrite(BUZZER_PIN, LOW);
+    }
+
+    previousDistance = distance;
+    previousTime = currentTime;
+
+    delay(50);
+}
