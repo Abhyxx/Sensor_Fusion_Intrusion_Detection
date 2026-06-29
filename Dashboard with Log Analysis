@@ -1,0 +1,910 @@
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart IDS Live Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --card: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #374151;
+      --safe: #22c55e;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --info: #38bdf8;
+      --purple: #a78bfa;
+    }
+
+    * {
+      box-sizing: border-box;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #111827 50%, #020617 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 1250px;
+      margin: 0 auto;
+      padding: 22px 0 32px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 30px;
+      letter-spacing: 0.3px;
+    }
+
+    .title-block p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .badge {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-weight: bold;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .connected {
+      color: var(--safe);
+      border-color: rgba(34,197,94,0.6);
+      background: rgba(34,197,94,0.08);
+    }
+
+    .disconnected {
+      color: var(--danger);
+      border-color: rgba(239,68,68,0.6);
+      background: rgba(239,68,68,0.08);
+    }
+
+    .connecting {
+      color: var(--warn);
+      border-color: rgba(245,158,11,0.6);
+      background: rgba(245,158,11,0.08);
+    }
+
+    .control-panel {
+      background: rgba(17,24,39,0.85);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 14px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 14px;
+    }
+
+    /* Section Link Navigation Area */
+    .dashboard-nav {
+      display: flex;
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px;
+      margin-bottom: 18px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .nav-item {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: bold;
+      padding: 8px 16px;
+      border-radius: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .nav-item:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    input {
+      background: #020617;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 13px;
+      outline: none;
+      font-size: 14px;
+      min-width: 220px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 15px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+      transition: transform 0.08s ease, opacity 0.15s ease;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .btn-connect { background: #2563eb; }
+    .btn-disconnect { background: #dc2626; }
+    .btn-export { background: #16a34a; }
+    .btn-clear { background: #64748b; }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+      line-height: 1.45;
+    }
+
+    .demo-status {
+      border-radius: 18px;
+      padding: 24px 18px;
+      text-align: center;
+      border: 1px solid var(--border);
+      background: #111827;
+      min-height: 126px;
+    }
+
+    .demo-status .label {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .demo-status .state {
+      font-size: 30px;
+      font-weight: 900;
+      margin-bottom: 8px;
+      word-break: break-word;
+    }
+
+    .demo-status .sub {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .state-safe { color: var(--safe); }
+    .state-static { color: var(--info); }
+    .state-warning { color: var(--warn); }
+    .state-danger { color: var(--danger); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: rgba(31,41,55,0.9);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      min-height: 112px;
+    }
+
+    .card .k {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .card .v {
+      font-size: 28px;
+      font-weight: 900;
+      line-height: 1.15;
+    }
+
+    .card .unit {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .panel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .panel {
+      background: rgba(17,24,39,0.9);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .mini-bars {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 150px 1fr 60px;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .bar-bg {
+      height: 12px;
+      border-radius: 999px;
+      background: #020617;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--info);
+      transition: width 0.2s ease;
+    }
+
+    .raw {
+      font-family: Consolas, monospace;
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      min-height: 72px;
+      color: #d1d5db;
+      word-break: break-word;
+      font-size: 13px;
+    }
+
+    /* Styles specifically generated for the new Forensic Log Module */
+    .security-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    
+    .sec-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .sec-card .label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .sec-card .value {
+      font-size: 18px;
+      font-weight: bold;
+      font-family: monospace;
+    }
+
+    .terminal-box {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      height: 150px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12.5px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+
+    .log-line-alert {
+      color: #f87171;
+      border-left: 3px solid var(--danger);
+      padding-left: 6px;
+      margin-bottom: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 9px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      background: rgba(2,6,23,0.45);
+      position: sticky;
+      top: 0;
+    }
+
+    .table-wrap {
+      max-height: 310px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    /* Footer Copyright Markup */
+    footer {
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+      margin-top: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .control-panel,
+      .panel-grid,
+      .security-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .input-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      input, button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title-block">
+        <h1>Smart IDS Live Dashboard</h1>
+        <p>ESP32 + RCWL-0516 Radar + HC-SR04 Ultrasonic Sensor Fusion</p>
+      </div>
+      <div id="connectionBadge" class="badge disconnected">Disconnected</div>
+    </div>
+
+    <div class="control-panel">
+      <div>
+        <div class="input-row">
+          <input id="ipInput" type="text" value="10.239.23.186" placeholder="ESP32 IP address e.g. 10.239.23.186" />
+          <button class="btn-connect" onclick="connectWS()">Connect</button>
+          <button class="btn-disconnect" onclick="disconnectWS()">Disconnect</button>
+          <button class="btn-export" onclick="exportCSV()">Export CSV</button>
+          <button class="btn-clear" onclick="clearLog()">Clear</button>
+        </div>
+        <div class="hint">
+          Keep laptop and ESP32 on the same network. The ESP32 WebSocket server must run on port 81.
+        </div>
+      </div>
+
+      <div id="demoStatus" class="demo-status">
+        <div class="label">Current System State</div>
+        <div id="stateText" class="state state-safe">WAITING</div>
+        <div id="stateSub" class="sub">Connect to ESP32 to start live monitoring.</div>
+      </div>
+    </div>
+
+    <div class="dashboard-nav">
+      <a href="#sensorAnalysisSection" class="nav-item">📊 Live Sensor Analysis</a>
+      <a href="#readingsSection" class="nav-item">📋 Recent Live Readings</a>
+      <a href="#logAnalysisSection" class="nav-item">🛡️ Security Log Analysis</a>
+    </div>
+
+    <div id="sensorAnalysisSection">
+      <div class="grid">
+        <div class="card">
+          <div class="k">Distance</div>
+          <div id="distanceVal" class="v">--</div>
+          <div class="unit">cm</div>
+        </div>
+        <div class="card">
+          <div class="k">Radar Count</div>
+          <div id="radarCountVal" class="v">--</div>
+          <div class="unit">0 to 10</div>
+        </div>
+        <div class="card">
+          <div class="k">Speed</div>
+          <div id="speedVal" class="v">--</div>
+          <div class="unit">cm/s</div>
+        </div>
+        <div class="card">
+          <div class="k">Rows Received</div>
+          <div id="rowsVal" class="v">0</div>
+          <div class="unit">live samples</div>
+        </div>
+      </div>
+
+      <div class="panel-grid">
+        <div class="panel">
+          <h2>Live Sensor Evidence</h2>
+          <div class="mini-bars">
+            <div class="bar-row">
+              <div>Radar Strength</div>
+              <div class="bar-bg"><div id="radarBar" class="bar-fill"></div></div>
+              <div id="radarPct">0%</div>
+            </div>
+            <div class="bar-row">
+              <div>Proximity Zone</div>
+              <div class="bar-bg"><div id="proximityBar" class="bar-fill"></div></div>
+              <div id="proximityPct">0%</div>
+            </div>
+            <div class="bar-row">
+              <div>Motion Change</div>
+              <div class="bar-bg"><div id="motionBar" class="bar-fill"></div></div>
+              <div id="motionPct">0%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Raw ESP32 Message</h2>
+          <div id="rawMessage" class="raw">No data yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="readingsSection">
+      <h2>Recent Live Readings</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Radar</th>
+              <th>Distance</th>
+              <th>Inference</th>
+              <th>Speed cm/s</th>
+              <th>Radar Count</th>
+            </tr>
+          </thead>
+          <tbody id="liveTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel" id="logAnalysisSection" style="border: 1px solid rgba(239, 68, 68, 0.35); background: rgba(17, 24, 39, 0.95);">
+      <h2 style="color: var(--danger); display: flex; align-items: center; gap: 8px;">🛡️ Layer-4/Layer-7 Forensic Log Analysis Panel</h2>
+      
+      <div class="security-grid">
+        <div class="sec-card" style="border-left: 4px solid var(--safe);" id="threatCard">
+          <div class="label">Active Threat Triage</div>
+          <div id="threatSeverity" class="value" style="color: var(--safe);">NOMINAL</div>
+        </div>
+        <div class="sec-card" style="border-left: 4px solid var(--info);">
+          <div class="label">Attack Velocity</div>
+          <div id="attackVelocity" class="value" style="color: var(--text);">0.00 req/min</div>
+        </div>
+        <div class="sec-card" style="border-left: 4px solid var(--purple);">
+          <div class="label">Top Offending Source Anchor</div>
+          <div id="topAttacker" class="value" style="color: var(--muted); font-size: 14px; word-break: break-all;">NONE</div>
+        </div>
+      </div>
+
+      <div class="label" style="font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; font-weight: bold; letter-spacing: 0.5px;">Real-Time Security Event Terminal</div>
+      <div id="securityTerminal" class="terminal-box">
+        <div style="color: var(--muted);">[INFO] Edge network origin tracker initialized. Awaiting packet analysis...</div>
+      </div>
+    </div>
+
+    <p class="footer-note">
+      Demo guide: Empty area should show SECURE. Static object should show STATIC_OBJECT_NEAR with no alarm. A moving/approaching person should show BREACH_VERIFIED.
+    </p>
+
+    <footer>
+      <div>&copy; 2026 Smart IDS Cyber-Physical Systems Framework. All Rights Reserved.</div>
+      <div style="color: var(--info); font-weight: bold; letter-spacing: 0.5px;">SECURE EDGE COMPUTER INTRUSION DETECTION</div>
+    </footer>
+  </div>
+
+<script>
+  let ws = null;
+  let logRows = [];
+  let securityEventsLog = []; // Registry tracking network-level intrusions
+
+  const columns = [
+    "timestamp_iso",
+    "radar_status",
+    "pir_placeholder",
+    "distance_cm",
+    "inference",
+    "speed_m_s",
+    "esp_millis",
+    "radar_bin",
+    "ultrasonic_active",
+    "inference_code",
+    "distance_change_cm",
+    "speed_cm_s",
+    "radar_count",
+    "raw_message"
+  ];
+
+  function setBadge(status) {
+    const badge = document.getElementById("connectionBadge");
+    badge.className = "badge " + status.className;
+    badge.textContent = status.text;
+  }
+
+  function connectWS() {
+    const ip = document.getElementById("ipInput").value.trim();
+    if (!ip) {
+      alert("Enter ESP32 IP address first.");
+      return;
+    }
+
+    disconnectWS(false);
+
+    const url = `ws://${ip}:81`;
+    setBadge({text: "Connecting...", className: "connecting"});
+
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      setBadge({text: "Connected", className: "connected"});
+      document.getElementById("stateText").textContent = "CONNECTED";
+      document.getElementById("stateSub").textContent = `Receiving data from ${url}`;
+    };
+
+    ws.onmessage = (event) => {
+      handlePayload(event.data);
+    };
+
+    ws.onerror = () => {
+      setBadge({text: "Connection Error", className: "disconnected"});
+      document.getElementById("stateText").textContent = "ERROR";
+      document.getElementById("stateText").className = "state state-danger";
+      document.getElementById("stateSub").textContent = "Check IP, Wi-Fi network, and ESP32 power.";
+    };
+
+    ws.onclose = () => {
+      setBadge({text: "Disconnected", className: "disconnected"});
+    };
+  }
+
+  function disconnectWS(updateState = true) {
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+    if (updateState) {
+      setBadge({text: "Disconnected", className: "disconnected"});
+    }
+  }
+
+  function handlePayload(payload) {
+    // SECURITY HANDSHAKE PARSER INTERCEPT
+    // Isolates alert anomalies sent directly from the edge network firewall
+    if (payload.startsWith("SECURITY_ALERT") || payload.startsWith("FINGERPRINT_BREACH") || payload.startsWith("HONEYPOT_CRASH")) {
+      const parts = payload.split(",");
+      const alertType = parts[0];
+      const rogueIP = parts[1] || "Unknown Source";
+      const timestamp = new Date();
+      
+      // Save data object attributes for analytical parsing
+      securityEventsLog.push({ timestamp: timestamp, type: alertType, ip: rogueIP });
+      
+      // Post explicit log text to the Security Terminal panel
+      const terminal = document.getElementById("securityTerminal");
+      const logLine = document.createElement("div");
+      logLine.className = "log-line-alert";
+      
+      if (alertType === "SECURITY_ALERT") {
+        logLine.innerText = `[${timestamp.toLocaleTimeString()}] ⚠️ IP BREACH: Unauthorized Layer-4 source node attempt dropped -> Source IP: ${rogueIP}`;
+      } else if (alertType === "FINGERPRINT_BREACH") {
+        logLine.style.borderColor = "var(--warn)";
+        logLine.style.color = "#fdba74";
+        logLine.innerText = `[${timestamp.toLocaleTimeString()}] 🛑 IDENTITY FRAUD: Layer-7 Browser signature mismatch from spoofed source -> IP: ${rogueIP}`;
+      } else if (alertType === "HONEYPOT_CRASH") {
+        logLine.style.borderColor = "var(--danger)";
+        logLine.style.fontWeight = "bold";
+        logLine.innerText = `[${timestamp.toLocaleTimeString()}] 🚨 HONEYPOT EXPLOIT SWEEP: Probe targeting Decoy Port 8080 from IP ${rogueIP}. ISOLATION ACTIVE.`;
+      }
+      
+      terminal.appendChild(logLine);
+      terminal.scrollTop = terminal.scrollHeight; // Keep scrolling window to latest element
+      
+      runForensicAnalysis();
+      document.getElementById("rawMessage").textContent = `[SECURITY LOG HANDSHAKE] => ${payload}`;
+      return;
+    }
+
+    const parts = payload.split(",");
+    if (parts.length < 12) {
+      return;
+    }
+
+    const now = new Date();
+    const row = {
+      timestamp_iso: now.toISOString(),
+      radar_status: parts[0],
+      pir_placeholder: parts[1],
+      distance_cm: parseFloat(parts[2]),
+      inference: parts[3],
+      speed_m_s: parseFloat(parts[4]),
+      esp_millis: parts[5],
+      radar_bin: parseInt(parts[6]),
+      ultrasonic_active: parseInt(parts[7]),
+      inference_code: parseInt(parts[8]),
+      distance_change_cm: parseFloat(parts[9]),
+      speed_cm_s: parseFloat(parts[10]),
+      radar_count: parseInt(parts[11]),
+      raw_message: payload
+    };
+
+    logRows.push(row);
+    updateCards(row);
+    updateTable(row);
+  }
+
+  // Real-Time Moving Time-Window Log Analysis Engine
+  function runForensicAnalysis() {
+    if (securityEventsLog.length === 0) return;
+
+    // 1. FREQUENCY COUNT REGISTRY (Anchor top offending source node)
+    const ipCounts = {};
+    let topIP = "NONE";
+    let maxCount = 0;
+
+    securityEventsLog.forEach(event => {
+      ipCounts[event.ip] = (ipCounts[event.ip] || 0) + 1;
+      if (ipCounts[event.ip] > maxCount) {
+        maxCount = ipCounts[event.ip];
+        topIP = event.ip;
+      }
+    });
+    document.getElementById("topAttacker").innerText = `${topIP} (${maxCount}x)`;
+    document.getElementById("topAttacker").style.color = "var(--danger)";
+
+    // 2. SPEED CALCULATION (Quantify Attack request rate per minute)
+    const now = new Date();
+    const recentEvents = securityEventsLog.filter(event => (now - event.timestamp) <= 60000);
+    document.getElementById("attackVelocity").innerText = `${recentEvents.length}.00 req/min`;
+    if (recentEvents.length > 0) {
+      document.getElementById("attackVelocity").style.color = "var(--warn)";
+    }
+
+    // 3. SEVERITY HEURISTIC CLASSIFICATION
+    const threatSeverity = document.getElementById("threatSeverity");
+    const threatCard = document.getElementById("threatCard");
+    const stateText = document.getElementById("stateText");
+    const stateSub = document.getElementById("stateSub");
+    
+    const hasHoneypotCrash = securityEventsLog.some(e => e.type === "HONEYPOT_CRASH");
+
+    if (hasHoneypotCrash) {
+      threatSeverity.innerText = "CRITICAL BREACH";
+      threatSeverity.style.color = "var(--danger)";
+      threatCard.style.borderColor = "var(--danger)";
+      
+      // Lock down UI display state box
+      stateText.innerText = "LOCKDOWN ACTIVE";
+      stateText.className = "state state-danger";
+      stateSub.innerText = "Decoy Honey-Token triggered. Perimeter code loops forced to air-gapped protection.";
+    } else if (recentEvents.length > 5) {
+      threatSeverity.innerText = "DOS ATTACK BRUTE";
+      threatSeverity.style.color = "var(--warn)";
+      threatCard.style.borderColor = "var(--warn)";
+    } else {
+      threatSeverity.innerText = "PROBING INTRUSION";
+      threatSeverity.style.color = "var(--info)";
+      threatCard.style.borderColor = "var(--info)";
+    }
+  }
+
+  function updateCards(row) {
+    document.getElementById("distanceVal").textContent = isFinite(row.distance_cm) ? row.distance_cm.toFixed(1) : "--";
+    document.getElementById("radarCountVal").textContent = isFinite(row.radar_count) ? row.radar_count : "--";
+    document.getElementById("speedVal").textContent = isFinite(row.speed_cm_s) ? row.speed_cm_s.toFixed(1) : "--";
+    document.getElementById("rowsVal").textContent = logRows.length;
+    document.getElementById("rawMessage").textContent = row.raw_message;
+
+    const state = document.getElementById("stateText");
+    const sub = document.getElementById("stateSub");
+
+    // Prevent data over-writes if honeypot lock state engine is deployed
+    const isLockedDown = securityEventsLog.some(e => e.type === "HONEYPOT_CRASH");
+    if (!isLockedDown) {
+      state.textContent = row.inference;
+
+      if (row.inference === "SECURE") {
+        state.className = "state state-safe";
+        sub.textContent = "No active intrusion evidence.";
+      } else if (row.inference === "STATIC_OBJECT_NEAR") {
+        state.className = "state state-static";
+        sub.textContent = "Static object detected near sensor. Alarm should remain OFF.";
+      } else if (row.inference === "BREACH_VERIFIED") {
+        state.className = "state state-danger";
+        sub.textContent = "Movement/proximity evidence detected. Alarm should be ON.";
+      } else if (row.inference === "RADAR_DISTANCE_TRACKING" || row.inference === "RADAR_ONLY") {
+        state.className = "state state-warning";
+        sub.textContent = "Motion evidence detected. Tracking possible activity.";
+      } else {
+        state.className = "state state-warning";
+        sub.textContent = "Monitoring live sensor activity.";
+      }
+    }
+
+    const radarPct = Math.max(0, Math.min(100, (row.radar_count / 10) * 100));
+    const proximityPct = computeProximity(row.distance_cm);
+    const motionPct = Math.max(0, Math.min(100, Math.abs(row.distance_change_cm) * 5));
+
+    setBar("radarBar", "radarPct", radarPct);
+    setBar("proximityBar", "proximityPct", proximityPct);
+    setBar("motionBar", "motionPct", motionPct);
+  }
+
+  function computeProximity(distance) {
+    if (!isFinite(distance) || distance >= 900) return 0;
+    if (distance <= 20) return 100;
+    if (distance >= 200) return 0;
+    return Math.round(((200 - distance) / 180) * 100);
+  }
+
+  function setBar(barId, pctId, pct) {
+    const bar = document.getElementById(barId);
+    const text = document.getElementById(pctId);
+    const rounded = Math.round(pct);
+    bar.style.width = rounded + "%";
+    text.textContent = rounded + "%";
+  }
+
+  function updateTable(row) {
+    const tbody = document.getElementById("liveTable");
+    const tr = document.createElement("tr");
+
+    const localTime = new Date(row.timestamp_iso).toLocaleTimeString();
+
+    tr.innerHTML = `
+      <td>${localTime}</td>
+      <td>${escapeHtml(row.radar_status)}</td>
+      <td>${row.distance_cm.toFixed(1)}</td>
+      <td>${escapeHtml(row.inference)}</td>
+      <td>${row.speed_cm_s.toFixed(1)}</td>
+      <td>${row.radar_count}</td>
+    `;
+
+    tbody.prepend(tr);
+
+    while (tbody.children.length > 40) {
+      tbody.removeChild(tbody.lastChild);
+    }
+  }
+
+  function exportCSV() {
+    if (logRows.length === 0) {
+      alert("No rows to export yet.");
+      return;
+    }
+
+    let csv = columns.join(",") + "\n";
+
+    for (const row of logRows) {
+      const vals = columns.map(col => {
+        let val = row[col];
+        if (val === null || val === undefined) val = "";
+        val = String(val);
+        if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+          val = '"' + val.replaceAll('"', '""') + '"';
+        }
+        return val;
+      });
+      csv += vals.join(",") + "\n";
+    }
+
+    const blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const ts = new Date().toISOString().replaceAll(":", "-").slice(0, 19);
+    a.href = url;
+    a.download = `ids_live_dashboard_export_${ts}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function clearLog() {
+    logRows = [];
+    securityEventsLog = [];
+    document.getElementById("liveTable").innerHTML = "";
+    document.getElementById("rowsVal").textContent = "0";
+    document.getElementById("rawMessage").textContent = "No data yet.";
+    
+    // Clear and reset the terminal logger fields back to steady states
+    document.getElementById("securityTerminal").innerHTML = `<div style="color: var(--muted);">[INFO] Forensic history reset. Awaiting network validation packets...</div>`;
+    const threatSeverity = document.getElementById("threatSeverity");
+    threatSeverity.innerText = "NOMINAL";
+    threatSeverity.style.color = "var(--safe)";
+    document.getElementById("threatCard").style.borderColor = "var(--border)";
+    document.getElementById("attackVelocity").innerText = "0.00 req/min";
+    document.getElementById("attackVelocity").style.color = "var(--text)";
+    document.getElementById("topAttacker").innerText = "NONE";
+    document.getElementById("topAttacker").style.color = "var(--muted)";
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+</script>
+</body>
+</html>
